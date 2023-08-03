@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+import sys
+import tkinter as tk
+import subprocess
+import re
+import threading
+
+def get_brightness():
+    try:
+        result = subprocess.run(["ddcutil", "getvcp", "10"], capture_output=True, text=True)
+        output = result.stdout.strip()
+        match = re.search(r"current value =\s+(\d+)", output)
+        if match:
+            brightness_value = int(match.group(1))
+            return brightness_value
+        else:
+            raise Exception("Cannot get brightness value from ddcutil")
+    except Exception as e:
+        raise Exception(f"Error getting brightness: {e}")
+
+def set_brightness(new_value):
+    try:
+        max_value_gui = 100
+        value_safe_range = max(1, min(max_value_gui, new_value))
+
+        # Use sudo to execute ddcutil command to set brightness
+        subprocess.run(["sudo", "ddcutil", "setvcp", "10", str(value_safe_range)], check=True)
+    except Exception as e:
+        raise Exception(f"Error setting brightness: {e}")
+
+def update_brightness_label():
+    try:
+        current_brightness = get_brightness()
+        brightness_label.config(text=f"Brightness: {current_brightness}%")
+    except Exception as e:
+        print(f"Error: {e}")
+
+    # Schedule the next update after 200 milliseconds (0.2 seconds)
+    window.after(200, update_brightness_label)
+
+def on_scale_dragged(*args):
+    try:
+        new_value = int(scale.get())
+        set_brightness(new_value)
+        brightness_label.config(text=f"Brightness: {new_value}%")
+    except Exception as e:
+        print(f"Error: {e}")
+
+def on_entry_apply():
+    try:
+        new_value = int(entry_var.get())
+        set_brightness(new_value)
+        brightness_label.config(text=f"Brightness: {new_value}%")
+        scale.set(new_value)
+    except ValueError:
+        pass
+
+def main():
+    global brightness_label, scale, window, entry_var
+
+    try:
+        # Get the current brightness value
+        current_brightness = get_brightness()
+        print(f"Current Brightness: {current_brightness}%")
+
+        if len(sys.argv) > 1:
+            # If a command-line argument is provided, update the brightness without opening the GUI
+            try:
+                new_value = int(sys.argv[1])
+                set_brightness(new_value)
+                print(f"Brightness updated to: {new_value}%")
+                return
+            except ValueError:
+                print("Invalid input for brightness. Using default GUI.")
+        
+        # Create the main window
+        window = tk.Tk()
+        window.title("Brightness Control")
+
+        # Create the Scale widget for the dial bar
+        scale = tk.Scale(window, from_=1, to=100, orient=tk.HORIZONTAL, length=300, command=on_scale_dragged)
+        scale.set(current_brightness)
+        scale.pack(pady=20)
+
+        # Create the label to display brightness
+        brightness_label = tk.Label(window, text=f"Brightness: {current_brightness}%", font=("Arial", 14))
+        brightness_label.pack()
+
+        # Create an Entry widget for brightness input
+        entry_var = tk.StringVar()
+        entry_var.set(current_brightness)
+        entry = tk.Entry(window, textvariable=entry_var)
+        entry.pack()
+
+        # Create a button to apply the brightness input
+        apply_button = tk.Button(window, text="Apply", command=on_entry_apply)
+        apply_button.pack()
+
+        # Start updating brightness label using threading
+        brightness_thread = threading.Thread(target=update_brightness_label)
+        brightness_thread.daemon = True
+        brightness_thread.start()
+
+        # Run the Tkinter main loop
+        window.mainloop()
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    main()
+
