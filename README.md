@@ -1,11 +1,9 @@
 # External_Monitor_Brightness_contro_GUI 
 ## Using `ddcutil`
-To run this program, open command line.
-
+To run this program, open terminal and run the following command
         python3 brgui
 
-This runs the program. But, to set the brightness using cli, just type
-
+To set the brightness using cli, just type
         python3 brgui 50
 
 This sets the brightness to 50%
